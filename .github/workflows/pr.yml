@@ -41,28 +41,22 @@ jobs:
       - name: Build Windows
         shell: powershell
         run: |
-          & "$env:UNITY_EXECUTABLE" `
-            -batchmode -nographics -quit `
-            -projectPath "$env:GITHUB_WORKSPACE" `
-            -executeMethod JamTemplate.Editor.BatchBuild.BuildWindows `
-            -logFile "$env:GITHUB_WORKSPACE/Build/windows_build.log"
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content "$env:GITHUB_WORKSPACE/Build/windows_build.log" -Tail 50
-            throw "Windows build failed with exit code $LASTEXITCODE"
+          $logFile = "$env:GITHUB_WORKSPACE\Build\windows_build.log"
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\Build" | Out-Null
+          $proc = Start-Process -FilePath "$env:UNITY_EXECUTABLE" -ArgumentList "-batchmode -nographics -quit -projectPath `"$env:GITHUB_WORKSPACE`" -executeMethod JamTemplate.Editor.BatchBuild.BuildWindows -logFile `"$logFile`"" -Wait -PassThru -NoNewWindow
+          if ($proc.ExitCode -ne 0) {
+            if (Test-Path $logFile) { Get-Content $logFile -Tail 50 }
+            throw "Windows build failed with exit code $($proc.ExitCode)"
           }
 
       - name: Build WebGL
         shell: powershell
         run: |
-          & "$env:UNITY_EXECUTABLE" `
-            -batchmode -nographics -quit `
-            -buildTarget WebGL `
-            -projectPath "$env:GITHUB_WORKSPACE" `
-            -executeMethod JamTemplate.Editor.BatchBuild.BuildWebGL `
-            -logFile "$env:GITHUB_WORKSPACE/Build/webgl_build.log"
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content "$env:GITHUB_WORKSPACE/Build/webgl_build.log" -Tail 50
-            throw "WebGL build failed with exit code $LASTEXITCODE"
+          $logFile = "$env:GITHUB_WORKSPACE\Build\webgl_build.log"
+          $proc = Start-Process -FilePath "$env:UNITY_EXECUTABLE" -ArgumentList "-batchmode -nographics -quit -buildTarget WebGL -projectPath `"$env:GITHUB_WORKSPACE`" -executeMethod JamTemplate.Editor.BatchBuild.BuildWebGL -logFile `"$logFile`"" -Wait -PassThru -NoNewWindow
+          if ($proc.ExitCode -ne 0) {
+            if (Test-Path $logFile) { Get-Content $logFile -Tail 50 }
+            throw "WebGL build failed with exit code $($proc.ExitCode)"
           }
 
       - name: Upload build logs on failure
