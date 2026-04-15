@@ -29,6 +29,7 @@ jobs:
 
       - name: Checkout with LFS
         uses: actions/checkout@v4
+        continue-on-error: true
         with:
           lfs: true
           clean: false
