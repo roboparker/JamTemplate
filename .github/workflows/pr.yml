@@ -1,0 +1,55 @@
+name: PR Build Validation
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+env:
+  UNITY_VERSION: "6000.3.13f1"
+  UNITY_EXECUTABLE: "C:/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe"
+
+jobs:
+  build:
+    name: Build (Windows + WebGL)
+    runs-on: [self-hosted, unity-builder]
+
+    steps:
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Build Windows
+        run: |
+          & "$env:UNITY_EXECUTABLE" `
+            -batchmode -nographics -quit `
+            -projectPath "$env:GITHUB_WORKSPACE" `
+            -executeMethod JamTemplate.Editor.BatchBuild.BuildWindows `
+            -logFile "$env:GITHUB_WORKSPACE/Build/windows_build.log"
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content "$env:GITHUB_WORKSPACE/Build/windows_build.log" -Tail 50
+            throw "Windows build failed with exit code $LASTEXITCODE"
+          }
+        shell: pwsh
+
+      - name: Build WebGL
+        run: |
+          & "$env:UNITY_EXECUTABLE" `
+            -batchmode -nographics -quit `
+            -buildTarget WebGL `
+            -projectPath "$env:GITHUB_WORKSPACE" `
+            -executeMethod JamTemplate.Editor.BatchBuild.BuildWebGL `
+            -logFile "$env:GITHUB_WORKSPACE/Build/webgl_build.log"
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content "$env:GITHUB_WORKSPACE/Build/webgl_build.log" -Tail 50
+            throw "WebGL build failed with exit code $LASTEXITCODE"
+          }
+        shell: pwsh
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: Build/*.log
+          retention-days: 7
