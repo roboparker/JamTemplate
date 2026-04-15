@@ -14,6 +14,16 @@ jobs:
     runs-on: [self-hosted, unity-builder]
 
     steps:
+      - name: Clean workspace
+        run: |
+          if (Test-Path "$env:GITHUB_WORKSPACE\_temp") {
+            Remove-Item -Recurse -Force "$env:GITHUB_WORKSPACE\_temp" -ErrorAction SilentlyContinue
+          }
+          if (Test-Path "${{ runner.temp }}") {
+            Remove-Item -Recurse -Force "${{ runner.temp }}\*" -ErrorAction SilentlyContinue
+          }
+        shell: pwsh
+
       - name: Checkout with LFS
         uses: actions/checkout@v4
         with:
