@@ -1,0 +1,126 @@
+name: Release Build
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+env:
+  UNITY_VERSION: "6000.3.13f1"
+  UNITY_EXECUTABLE: "C:/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe"
+  ITCH_TARGET_WINDOWS: "roboparker/jamtemplate:windows"
+  ITCH_TARGET_WEBGL: "roboparker/jamtemplate:html5"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    name: Build, Tag & Release
+    runs-on: [self-hosted, unity-builder]
+
+    steps:
+      - name: Kill stale processes
+        shell: powershell
+        run: |
+          Get-Process -Name git, git-remote-https -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-ChildItem "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+      - name: Checkout with LFS
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          lfs: true
+          clean: false
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean stale Unity state
+        shell: powershell
+        run: |
+          Remove-Item "$env:GITHUB_WORKSPACE\Temp\UnityLockfile" -ErrorAction SilentlyContinue
+          Remove-Item "$env:GITHUB_WORKSPACE\Build" -Recurse -ErrorAction SilentlyContinue
+
+      - name: Bump version
+        id: version
+        shell: powershell
+        run: |
+          $versionFile = "VERSION.txt"
+          $version = (Get-Content $versionFile).Trim()
+          $parts = $version -split '\.'
+          $parts[2] = [int]$parts[2] + 1
+          $newVersion = $parts -join '.'
+          Set-Content $versionFile $newVersion
+          echo "VERSION=$newVersion" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$newVersion" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $version -> $newVersion"
+
+      - name: Commit version bump
+        shell: powershell
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.txt
+          git commit -m "Bump version to ${{ steps.version.outputs.VERSION }}"
+          git push
+
+      - name: Build Windows
+        shell: powershell
+        run: |
+          $logFile = "$env:GITHUB_WORKSPACE\Build\windows_build.log"
+          New-Item -ItemType Directory -Force -Path "$env:GITHUB_WORKSPACE\Build" | Out-Null
+          $proc = Start-Process -FilePath "$env:UNITY_EXECUTABLE" -ArgumentList "-batchmode -nographics -quit -projectPath `"$env:GITHUB_WORKSPACE`" -executeMethod JamTemplate.Editor.BatchBuild.BuildWindows -logFile `"$logFile`"" -Wait -PassThru -NoNewWindow
+          if ($proc.ExitCode -ne 0) {
+            if (Test-Path $logFile) { Get-Content $logFile -Tail 50 }
+            throw "Windows build failed with exit code $($proc.ExitCode)"
+          }
+
+      - name: Build WebGL
+        shell: powershell
+        run: |
+          $logFile = "$env:GITHUB_WORKSPACE\Build\webgl_build.log"
+          $proc = Start-Process -FilePath "$env:UNITY_EXECUTABLE" -ArgumentList "-batchmode -nographics -quit -buildTarget WebGL -projectPath `"$env:GITHUB_WORKSPACE`" -executeMethod JamTemplate.Editor.BatchBuild.BuildWebGL -logFile `"$logFile`"" -Wait -PassThru -NoNewWindow
+          if ($proc.ExitCode -ne 0) {
+            if (Test-Path $logFile) { Get-Content $logFile -Tail 50 }
+            throw "WebGL build failed with exit code $($proc.ExitCode)"
+          }
+
+      - name: Create git tag
+        shell: powershell
+        run: |
+          git tag ${{ steps.version.outputs.TAG }}
+          git push origin ${{ steps.version.outputs.TAG }}
+
+      - name: Package Windows build
+        shell: powershell
+        run: Compress-Archive -Path "Build\Windows\*" -DestinationPath "Build\JamTemplate-Windows-${{ steps.version.outputs.TAG }}.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: ${{ steps.version.outputs.TAG }}
+          files: |
+            Build/JamTemplate-Windows-${{ steps.version.outputs.TAG }}.zip
+          generate_release_notes: true
+
+      - name: Push to itch.io (Windows)
+        shell: powershell
+        run: C:\tools\butler\butler.exe push Build\Windows ${{ env.ITCH_TARGET_WINDOWS }} --userversion ${{ steps.version.outputs.VERSION }}
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+
+      - name: Push to itch.io (WebGL)
+        shell: powershell
+        run: C:\tools\butler\butler.exe push Build\WebGL ${{ env.ITCH_TARGET_WEBGL }} --userversion ${{ steps.version.outputs.VERSION }}
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: Build/*.log
+          retention-days: 7
