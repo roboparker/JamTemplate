@@ -4,9 +4,14 @@ on:
   pull_request:
     types: [opened, synchronize]
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 env:
   UNITY_VERSION: "6000.3.13f1"
   UNITY_EXECUTABLE: "C:/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
@@ -14,15 +19,11 @@ jobs:
     runs-on: [self-hosted, unity-builder]
 
     steps:
-      - name: Clean workspace
+      - name: Kill stale processes
+        shell: powershell
         run: |
-          if (Test-Path "$env:GITHUB_WORKSPACE\_temp") {
-            Remove-Item -Recurse -Force "$env:GITHUB_WORKSPACE\_temp" -ErrorAction SilentlyContinue
-          }
-          if (Test-Path "${{ runner.temp }}") {
-            Remove-Item -Recurse -Force "${{ runner.temp }}\*" -ErrorAction SilentlyContinue
-          }
-        shell: pwsh
+          Get-Process -Name git, git-remote-https -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-ChildItem "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Checkout with LFS
         uses: actions/checkout@v4
@@ -31,6 +32,7 @@ jobs:
           clean: false
 
       - name: Build Windows
+        shell: pwsh
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -41,9 +43,9 @@ jobs:
             Get-Content "$env:GITHUB_WORKSPACE/Build/windows_build.log" -Tail 50
             throw "Windows build failed with exit code $LASTEXITCODE"
           }
-        shell: pwsh
 
       - name: Build WebGL
+        shell: pwsh
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -55,7 +57,6 @@ jobs:
             Get-Content "$env:GITHUB_WORKSPACE/Build/webgl_build.log" -Tail 50
             throw "WebGL build failed with exit code $LASTEXITCODE"
           }
-        shell: pwsh
 
       - name: Upload build logs on failure
         if: failure()

@@ -4,11 +4,16 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 env:
   UNITY_VERSION: "6000.3.13f1"
   UNITY_EXECUTABLE: "C:/Program Files/Unity/Hub/Editor/6000.3.13f1/Editor/Unity.exe"
   ITCH_TARGET_WINDOWS: "roboparker/jamtemplate:windows"
   ITCH_TARGET_WEBGL: "roboparker/jamtemplate:html5"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   release:
@@ -16,15 +21,11 @@ jobs:
     runs-on: [self-hosted, unity-builder]
 
     steps:
-      - name: Clean workspace
+      - name: Kill stale processes
+        shell: powershell
         run: |
-          if (Test-Path "$env:GITHUB_WORKSPACE\_temp") {
-            Remove-Item -Recurse -Force "$env:GITHUB_WORKSPACE\_temp" -ErrorAction SilentlyContinue
-          }
-          if (Test-Path "${{ runner.temp }}") {
-            Remove-Item -Recurse -Force "${{ runner.temp }}\*" -ErrorAction SilentlyContinue
-          }
-        shell: pwsh
+          Get-Process -Name git, git-remote-https -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Get-ChildItem "$env:RUNNER_TEMP" -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
       - name: Checkout with LFS
         uses: actions/checkout@v4
@@ -36,6 +37,7 @@ jobs:
 
       - name: Bump version
         id: version
+        shell: pwsh
         run: |
           $versionFile = "VERSION.txt"
           $version = (Get-Content $versionFile).Trim()
@@ -46,18 +48,18 @@ jobs:
           echo "VERSION=$newVersion" >> $env:GITHUB_OUTPUT
           echo "TAG=v$newVersion" >> $env:GITHUB_OUTPUT
           Write-Host "Version: $version -> $newVersion"
-        shell: pwsh
 
       - name: Commit version bump
+        shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add VERSION.txt
           git commit -m "Bump version to ${{ steps.version.outputs.VERSION }}"
           git push
-        shell: pwsh
 
       - name: Build Windows
+        shell: pwsh
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -68,9 +70,9 @@ jobs:
             Get-Content "$env:GITHUB_WORKSPACE/Build/windows_build.log" -Tail 50
             throw "Windows build failed with exit code $LASTEXITCODE"
           }
-        shell: pwsh
 
       - name: Build WebGL
+        shell: pwsh
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -82,17 +84,16 @@ jobs:
             Get-Content "$env:GITHUB_WORKSPACE/Build/webgl_build.log" -Tail 50
             throw "WebGL build failed with exit code $LASTEXITCODE"
           }
-        shell: pwsh
 
       - name: Create git tag
+        shell: pwsh
         run: |
           git tag ${{ steps.version.outputs.TAG }}
           git push origin ${{ steps.version.outputs.TAG }}
-        shell: pwsh
 
       - name: Package Windows build
-        run: Compress-Archive -Path "Build/Windows/*" -DestinationPath "Build/JamTemplate-Windows-${{ steps.version.outputs.TAG }}.zip"
         shell: pwsh
+        run: Compress-Archive -Path "Build/Windows/*" -DestinationPath "Build/JamTemplate-Windows-${{ steps.version.outputs.TAG }}.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -104,14 +105,14 @@ jobs:
           generate_release_notes: true
 
       - name: Push to itch.io (Windows)
-        run: C:\tools\butler\butler.exe push Build/Windows ${{ env.ITCH_TARGET_WINDOWS }} --userversion ${{ steps.version.outputs.VERSION }}
         shell: pwsh
+        run: C:\tools\butler\butler.exe push Build/Windows ${{ env.ITCH_TARGET_WINDOWS }} --userversion ${{ steps.version.outputs.VERSION }}
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
 
       - name: Push to itch.io (WebGL)
-        run: C:\tools\butler\butler.exe push Build/WebGL ${{ env.ITCH_TARGET_WEBGL }} --userversion ${{ steps.version.outputs.VERSION }}
         shell: pwsh
+        run: C:\tools\butler\butler.exe push Build/WebGL ${{ env.ITCH_TARGET_WEBGL }} --userversion ${{ steps.version.outputs.VERSION }}
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
 
