@@ -32,6 +32,12 @@ jobs:
           lfs: true
           clean: false
 
+      - name: Clean stale Unity state
+        shell: powershell
+        run: |
+          Remove-Item "$env:GITHUB_WORKSPACE\Temp\UnityLockfile" -ErrorAction SilentlyContinue
+          Remove-Item "$env:GITHUB_WORKSPACE\Build" -Recurse -ErrorAction SilentlyContinue
+
       - name: Build Windows
         shell: powershell
         run: |

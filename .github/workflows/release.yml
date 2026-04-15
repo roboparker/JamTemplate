@@ -59,6 +59,12 @@ jobs:
           git commit -m "Bump version to ${{ steps.version.outputs.VERSION }}"
           git push
 
+      - name: Clean stale Unity state
+        shell: powershell
+        run: |
+          Remove-Item "$env:GITHUB_WORKSPACE\Temp\UnityLockfile" -ErrorAction SilentlyContinue
+          Remove-Item "$env:GITHUB_WORKSPACE\Build" -Recurse -ErrorAction SilentlyContinue
+
       - name: Build Windows
         shell: powershell
         run: |
