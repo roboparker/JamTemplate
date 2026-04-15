@@ -38,7 +38,7 @@ jobs:
 
       - name: Bump version
         id: version
-        shell: pwsh
+        shell: powershell
         run: |
           $versionFile = "VERSION.txt"
           $version = (Get-Content $versionFile).Trim()
@@ -51,7 +51,7 @@ jobs:
           Write-Host "Version: $version -> $newVersion"
 
       - name: Commit version bump
-        shell: pwsh
+        shell: powershell
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -60,7 +60,7 @@ jobs:
           git push
 
       - name: Build Windows
-        shell: pwsh
+        shell: powershell
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -73,7 +73,7 @@ jobs:
           }
 
       - name: Build WebGL
-        shell: pwsh
+        shell: powershell
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -87,13 +87,13 @@ jobs:
           }
 
       - name: Create git tag
-        shell: pwsh
+        shell: powershell
         run: |
           git tag ${{ steps.version.outputs.TAG }}
           git push origin ${{ steps.version.outputs.TAG }}
 
       - name: Package Windows build
-        shell: pwsh
+        shell: powershell
         run: Compress-Archive -Path "Build/Windows/*" -DestinationPath "Build/JamTemplate-Windows-${{ steps.version.outputs.TAG }}.zip"
 
       - name: Create GitHub Release
@@ -106,13 +106,13 @@ jobs:
           generate_release_notes: true
 
       - name: Push to itch.io (Windows)
-        shell: pwsh
+        shell: powershell
         run: C:\tools\butler\butler.exe push Build/Windows ${{ env.ITCH_TARGET_WINDOWS }} --userversion ${{ steps.version.outputs.VERSION }}
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
 
       - name: Push to itch.io (WebGL)
-        shell: pwsh
+        shell: powershell
         run: C:\tools\butler\butler.exe push Build/WebGL ${{ env.ITCH_TARGET_WEBGL }} --userversion ${{ steps.version.outputs.VERSION }}
         env:
           BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}

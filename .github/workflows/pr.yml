@@ -33,7 +33,7 @@ jobs:
           clean: false
 
       - name: Build Windows
-        shell: pwsh
+        shell: powershell
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
@@ -46,7 +46,7 @@ jobs:
           }
 
       - name: Build WebGL
-        shell: pwsh
+        shell: powershell
         run: |
           & "$env:UNITY_EXECUTABLE" `
             -batchmode -nographics -quit `
