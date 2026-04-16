@@ -10,6 +10,7 @@ using JamTemplate.UI;
 using JamTemplate.Save;
 using JamTemplate.Scene;
 using JamTemplate.GameState;
+using JamTemplate.Audio;
 using JamTemplate.Demo;
 
 namespace JamTemplate.Editor
@@ -30,9 +31,10 @@ namespace JamTemplate.Editor
             if (defaultFont == null)
                 defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            // Create SaveConfig asset if it doesn't exist
+            // Create ScriptableObject assets if they don't exist
             CreateSaveConfigAsset();
             CreateCreditsDataAsset();
+            CreateAudioConfigAsset();
 
             // Ensure scenes directory exists
             if (!AssetDatabase.IsValidFolder(ScenesPath))
@@ -151,6 +153,13 @@ namespace JamTemplate.Editor
             // GameStateManager
             var gameStateGo = new GameObject("GameStateManager");
             gameStateGo.AddComponent<GameStateManager>();
+
+            // AudioManager
+            var audioManagerGo = new GameObject("AudioManager");
+            var audioManager = audioManagerGo.AddComponent<AudioManager>();
+            var audioConfig = AssetDatabase.LoadAssetAtPath<AudioConfig>("Assets/Data/AudioConfig.asset");
+            if (audioConfig != null)
+                SetPrivateField(audioManager, "config", audioConfig);
 
             // ── UI ──
             var canvas = CreateCanvas("TitleCanvas", 0);
@@ -562,6 +571,18 @@ namespace JamTemplate.Editor
 
             var data = ScriptableObject.CreateInstance<CreditsData>();
             AssetDatabase.CreateAsset(data, path);
+        }
+
+        private static void CreateAudioConfigAsset()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Data"))
+                AssetDatabase.CreateFolder("Assets", "Data");
+
+            string path = "Assets/Data/AudioConfig.asset";
+            if (AssetDatabase.LoadAssetAtPath<AudioConfig>(path) != null) return;
+
+            var config = ScriptableObject.CreateInstance<AudioConfig>();
+            AssetDatabase.CreateAsset(config, path);
         }
 
         // ─────────────────────────────────────────────
