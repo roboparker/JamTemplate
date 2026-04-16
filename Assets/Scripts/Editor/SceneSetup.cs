@@ -11,6 +11,7 @@ using JamTemplate.Save;
 using JamTemplate.Scene;
 using JamTemplate.GameState;
 using JamTemplate.Audio;
+using JamTemplate.HiScore;
 using JamTemplate.Demo;
 
 namespace JamTemplate.Editor
@@ -35,6 +36,7 @@ namespace JamTemplate.Editor
             CreateSaveConfigAsset();
             CreateCreditsDataAsset();
             CreateAudioConfigAsset();
+            CreateHiScoreConfigAsset();
 
             // Ensure scenes directory exists
             if (!AssetDatabase.IsValidFolder(ScenesPath))
@@ -160,6 +162,13 @@ namespace JamTemplate.Editor
             var audioConfig = AssetDatabase.LoadAssetAtPath<AudioConfig>("Assets/Data/AudioConfig.asset");
             if (audioConfig != null)
                 SetPrivateField(audioManager, "config", audioConfig);
+
+            // HiScoreManager
+            var hiScoreGo = new GameObject("HiScoreManager");
+            var hiScoreManager = hiScoreGo.AddComponent<HiScoreManager>();
+            var hiScoreConfig = AssetDatabase.LoadAssetAtPath<HiScoreConfig>("Assets/Data/HiScoreConfig.asset");
+            if (hiScoreConfig != null)
+                SetPrivateField(hiScoreManager, "config", hiScoreConfig);
 
             // ── UI ──
             var canvas = CreateCanvas("TitleCanvas", 0);
@@ -582,6 +591,18 @@ namespace JamTemplate.Editor
             if (AssetDatabase.LoadAssetAtPath<AudioConfig>(path) != null) return;
 
             var config = ScriptableObject.CreateInstance<AudioConfig>();
+            AssetDatabase.CreateAsset(config, path);
+        }
+
+        private static void CreateHiScoreConfigAsset()
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/Data"))
+                AssetDatabase.CreateFolder("Assets", "Data");
+
+            string path = "Assets/Data/HiScoreConfig.asset";
+            if (AssetDatabase.LoadAssetAtPath<HiScoreConfig>(path) != null) return;
+
+            var config = ScriptableObject.CreateInstance<HiScoreConfig>();
             AssetDatabase.CreateAsset(config, path);
         }
 
