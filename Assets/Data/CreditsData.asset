@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ca837b2b0b5c314bac546dc6e2c0a48, type: 3}
+  m_Name: CreditsData
+  m_EditorClassIdentifier: JamTemplate.Runtime::JamTemplate.UI.CreditsData
+  gameTitle: Game Title
+  sections:
+  - heading: Development
+    entries:
+    - Your Name
+  - heading: Art
+    entries:
+    - Artist Name
+  - heading: Audio
+    entries:
+    - Composer Name
+  - heading: Tools
+    entries:
+    - Unity 6
+    - Wwise (optional)
+  - heading: Special Thanks
+    entries:
+    - Game Jam Organizers
+    - Playtesters

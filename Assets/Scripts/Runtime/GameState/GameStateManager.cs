@@ -134,13 +134,19 @@ namespace JamTemplate.GameState
         }
 
         /// <summary>
-        /// Quit the game. Uses EditorApplication.isPlaying in the editor,
-        /// Application.Quit() in builds.
+        /// Quit the game.
+        /// Editor: stops play mode.
+        /// WebGL: Application.Quit() is a no-op — does nothing (hide Quit buttons via controller).
+        /// Standalone: calls Application.Quit().
         /// </summary>
         public void QuitGame()
         {
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
+#elif UNITY_WEBGL
+            // Application.Quit() is a no-op on WebGL.
+            // Quit buttons should be hidden via hideQuitButtonOnWebGL in UI controllers.
+            Debug.Log("[GameStateManager] Quit requested on WebGL — no-op.");
 #else
             Application.Quit();
 #endif
