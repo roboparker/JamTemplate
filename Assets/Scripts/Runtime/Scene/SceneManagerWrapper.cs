@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using JamTemplate.UI;
@@ -11,7 +12,10 @@ namespace JamTemplate.Scene
     /// - Single: full scene swap with ScreenFade transition
     /// - Additive: load a UI scene on top (Settings, Pause, Win, Lose, Credits)
     ///
-    /// Only one additive scene is open at a time — loading a new one unloads the previous.
+    /// Only one additive scene is visible at a time. Loading a new additive scene
+    /// pushes the current one onto a stack. Back() restores the previous additive scene.
+    /// This allows Pause → Settings → Back → Pause navigation.
+    ///
     /// Persists across scene loads via DontDestroyOnLoad.
     /// </summary>
     public class SceneManagerWrapper : MonoBehaviour
@@ -22,6 +26,7 @@ namespace JamTemplate.Scene
         public event Action<string> OnSceneLoadComplete;
 
         private string currentAdditiveScene;
+        private readonly Stack<string> additiveSceneStack = new Stack<string>();
         private bool isTransitioning;
 
         /// <summary>True while a scene load/unload is in progress.</summary>
@@ -47,7 +52,7 @@ namespace JamTemplate.Scene
 
         /// <summary>
         /// Load a scene in Single mode with a fade transition.
-        /// Unloads any active additive scene first.
+        /// Clears any active additive scenes and the scene stack.
         /// </summary>
         public void LoadScene(string sceneName)
         {
@@ -57,7 +62,8 @@ namespace JamTemplate.Scene
 
         /// <summary>
         /// Load a scene additively on top of the current scene.
-        /// If another additive scene is already open, it is unloaded first.
+        /// If another additive scene is already open, it is pushed onto the stack
+        /// (unloaded but remembered) so Back() can restore it.
         /// </summary>
         public void LoadSceneAdditive(string sceneName)
         {
@@ -67,21 +73,24 @@ namespace JamTemplate.Scene
 
         /// <summary>
         /// Unload a specific additive scene by name.
+        /// Does not restore previously stacked scenes — use Back() for that.
         /// </summary>
         public void UnloadAdditiveScene(string sceneName)
         {
             if (isTransitioning) return;
             if (currentAdditiveScene != sceneName) return;
-            StartCoroutine(UnloadAdditiveCoroutine(sceneName));
+            StartCoroutine(UnloadAdditiveCoroutine(sceneName, restorePrevious: false));
         }
 
         /// <summary>
-        /// Unload the current additive scene (if any).
+        /// Unload the current additive scene and restore the previous one from the stack.
+        /// If no previous scene exists, simply unloads the current additive scene.
         /// </summary>
         public void Back()
         {
             if (string.IsNullOrEmpty(currentAdditiveScene)) return;
-            UnloadAdditiveScene(currentAdditiveScene);
+            if (isTransitioning) return;
+            StartCoroutine(UnloadAdditiveCoroutine(currentAdditiveScene, restorePrevious: true));
         }
 
         private IEnumerator LoadSceneCoroutine(string sceneName)
@@ -97,14 +106,15 @@ namespace JamTemplate.Scene
                 while (!fadeDone) yield return null;
             }
 
-            // Unload additive scene if one is open
+            // Clear additive scene state
             if (!string.IsNullOrEmpty(currentAdditiveScene))
             {
                 var unloadOp = SceneManager.UnloadSceneAsync(currentAdditiveScene);
                 if (unloadOp != null)
                     while (!unloadOp.isDone) yield return null;
-                currentAdditiveScene = null;
             }
+            currentAdditiveScene = null;
+            additiveSceneStack.Clear();
 
             // Load the new scene
             var loadOp = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
@@ -128,9 +138,10 @@ namespace JamTemplate.Scene
             isTransitioning = true;
             OnSceneLoadStart?.Invoke(sceneName);
 
-            // Unload current additive scene first
+            // Push current additive scene onto stack (unload it, remember it)
             if (!string.IsNullOrEmpty(currentAdditiveScene))
             {
+                additiveSceneStack.Push(currentAdditiveScene);
                 var unloadOp = SceneManager.UnloadSceneAsync(currentAdditiveScene);
                 if (unloadOp != null)
                     while (!unloadOp.isDone) yield return null;
@@ -147,7 +158,7 @@ namespace JamTemplate.Scene
             OnSceneLoadComplete?.Invoke(sceneName);
         }
 
-        private IEnumerator UnloadAdditiveCoroutine(string sceneName)
+        private IEnumerator UnloadAdditiveCoroutine(string sceneName, bool restorePrevious)
         {
             isTransitioning = true;
 
@@ -156,6 +167,17 @@ namespace JamTemplate.Scene
                 while (!unloadOp.isDone) yield return null;
 
             currentAdditiveScene = null;
+
+            // Restore previous additive scene from the stack
+            if (restorePrevious && additiveSceneStack.Count > 0)
+            {
+                string previousScene = additiveSceneStack.Pop();
+                var loadOp = SceneManager.LoadSceneAsync(previousScene, LoadSceneMode.Additive);
+                if (loadOp != null)
+                    while (!loadOp.isDone) yield return null;
+                currentAdditiveScene = previousScene;
+            }
+
             isTransitioning = false;
         }
     }

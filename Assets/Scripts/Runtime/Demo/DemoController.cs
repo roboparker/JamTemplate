@@ -1,20 +1,62 @@
 using UnityEngine;
+using UnityEngine.UI;
+using JamTemplate.GameState;
+using JamTemplate.Scene;
 
 namespace JamTemplate.Demo
 {
     /// <summary>
-    /// Demo scene controller that exercises all core systems.
-    /// Attach to a GameObject in the Demo scene.
-    /// Replace or remove this when starting a jam.
+    /// Demo gameplay scene controller that exercises all core systems.
+    /// Replace or extend this when starting a jam.
     /// </summary>
     public class DemoController : MonoBehaviour
     {
-        // TODO: Wire up buttons and system calls as core systems are implemented.
-        // - ScreenFade on load
-        // - MusicManager playing placeholder BGM
-        // - Button triggering SFXManager
-        // - GameStateManager: pause, win, lose flows
-        // - Settings button -> loads Settings scene additively
-        // - SceneManager transition back to Title
+        [Header("Buttons")]
+        [SerializeField] private Button pauseButton;
+        [SerializeField] private Button winButton;
+        [SerializeField] private Button loseButton;
+
+        private void Start()
+        {
+            if (pauseButton != null)
+                pauseButton.onClick.AddListener(OnPauseClicked);
+            if (winButton != null)
+                winButton.onClick.AddListener(OnWinClicked);
+            if (loseButton != null)
+                loseButton.onClick.AddListener(OnLoseClicked);
+        }
+
+        private void Update()
+        {
+            // Pause on Escape key
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (GameStateManager.Instance != null)
+                {
+                    if (GameStateManager.Instance.IsPlaying)
+                        GameStateManager.Instance.Pause();
+                    else if (GameStateManager.Instance.IsPaused)
+                        GameStateManager.Instance.Resume();
+                }
+            }
+        }
+
+        public void OnPauseClicked()
+        {
+            if (GameStateManager.Instance != null && GameStateManager.Instance.IsPlaying)
+                GameStateManager.Instance.Pause();
+        }
+
+        public void OnWinClicked()
+        {
+            if (GameStateManager.Instance != null)
+                GameStateManager.Instance.TriggerWin();
+        }
+
+        public void OnLoseClicked()
+        {
+            if (GameStateManager.Instance != null)
+                GameStateManager.Instance.TriggerGameOver();
+        }
     }
 }
