@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using JamTemplate.Save;
+using JamTemplate.Audio;
 using JamTemplate.Scene;
 
 namespace JamTemplate.UI
@@ -8,7 +8,7 @@ namespace JamTemplate.UI
     /// <summary>
     /// Controls the Settings additive scene.
     /// Master, Music, and SFX volume sliders.
-    /// Persists values via SaveManager.
+    /// Persists values via AudioManager (which delegates to SaveManager).
     /// Works from both Title and Pause contexts.
     /// </summary>
     public class SettingsController : MonoBehaviour
@@ -20,11 +20,6 @@ namespace JamTemplate.UI
 
         [Header("Buttons")]
         [SerializeField] private Button backButton;
-
-        // Save keys
-        private const string MasterVolumeKey = "MasterVolume";
-        private const string MusicVolumeKey = "MusicVolume";
-        private const string SfxVolumeKey = "SfxVolume";
 
         private void Start()
         {
@@ -42,40 +37,42 @@ namespace JamTemplate.UI
 
         private void LoadSettings()
         {
-            if (SaveManager.Instance == null) return;
-
-            float master = SaveManager.Instance.LoadFloat(MasterVolumeKey, 1f);
-            float music = SaveManager.Instance.LoadFloat(MusicVolumeKey, 1f);
-            float sfx = SaveManager.Instance.LoadFloat(SfxVolumeKey, 1f);
-
-            if (masterVolumeSlider != null) masterVolumeSlider.SetValueWithoutNotify(master);
-            if (musicVolumeSlider != null) musicVolumeSlider.SetValueWithoutNotify(music);
-            if (sfxVolumeSlider != null) sfxVolumeSlider.SetValueWithoutNotify(sfx);
+            if (AudioManager.Instance != null)
+            {
+                if (masterVolumeSlider != null)
+                    masterVolumeSlider.SetValueWithoutNotify(AudioManager.Instance.MasterVolume);
+                if (musicVolumeSlider != null)
+                    musicVolumeSlider.SetValueWithoutNotify(AudioManager.Instance.MusicVolumeProp);
+                if (sfxVolumeSlider != null)
+                    sfxVolumeSlider.SetValueWithoutNotify(AudioManager.Instance.SFXVolumeProp);
+            }
+            else
+            {
+                // Fallback: default to 1.0
+                if (masterVolumeSlider != null) masterVolumeSlider.SetValueWithoutNotify(1f);
+                if (musicVolumeSlider != null) musicVolumeSlider.SetValueWithoutNotify(1f);
+                if (sfxVolumeSlider != null) sfxVolumeSlider.SetValueWithoutNotify(1f);
+            }
         }
 
         private void OnMasterVolumeChanged(float value)
         {
-            if (SaveManager.Instance != null)
-                SaveManager.Instance.Save(MasterVolumeKey, value);
-
-            // TODO: Wire to AudioManager when audio system is implemented
-            AudioListener.volume = value;
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.SetMasterVolume(value);
+            else
+                AudioListener.volume = value;
         }
 
         private void OnMusicVolumeChanged(float value)
         {
-            if (SaveManager.Instance != null)
-                SaveManager.Instance.Save(MusicVolumeKey, value);
-
-            // TODO: Wire to AudioManager.SetMusicVolume() when audio system is implemented
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.SetMusicVolume(value);
         }
 
         private void OnSfxVolumeChanged(float value)
         {
-            if (SaveManager.Instance != null)
-                SaveManager.Instance.Save(SfxVolumeKey, value);
-
-            // TODO: Wire to AudioManager.SetSfxVolume() when audio system is implemented
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.SetSFXVolume(value);
         }
 
         public void OnBackClicked()
